@@ -4,6 +4,10 @@ import { RemixServer } from "@remix-run/react";
 import { createReadableStreamFromReadable } from "@remix-run/node";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
+import { bootstrapApp } from "./services/appBootstrap.js";
+
+// 启动应用服务（定时任务等）
+bootstrapApp();
 
 export const streamTimeout = 5000;
 
