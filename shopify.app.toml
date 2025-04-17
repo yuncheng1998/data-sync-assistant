@@ -3,7 +3,7 @@
 client_id = "bc414c52b400a13519833e5ee4cac357"
 name = "data-sync-assistant"
 handle = "data-sync-assistant"
-application_url = "https://modem-reviewing-establishment-craft.trycloudflare.com"
+application_url = "https://challenged-bedding-booty-fraud.trycloudflare.com"
 embedded = true
 
 [build]
@@ -27,9 +27,9 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://modem-reviewing-establishment-craft.trycloudflare.com/auth/callback",
-  "https://modem-reviewing-establishment-craft.trycloudflare.com/auth/shopify/callback",
-  "https://modem-reviewing-establishment-craft.trycloudflare.com/api/auth/callback"
+  "https://challenged-bedding-booty-fraud.trycloudflare.com/auth/callback",
+  "https://challenged-bedding-booty-fraud.trycloudflare.com/auth/shopify/callback",
+  "https://challenged-bedding-booty-fraud.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]

@@ -95,7 +95,7 @@ export const typeDefs = gql`
     """变体唯一标识"""
     id: ID!
     """变体标题"""
-    title: String
+    title: String!
     """变体价格"""
     price: String
     """比较价格"""
@@ -108,6 +108,12 @@ export const typeDefs = gql`
     requiresShipping: Boolean
     """条形码"""
     barcode: String
+    """产品ID"""
+    productId: ID!
+    """创建时间"""
+    createdAt: DateTime!
+    """最后更新时间"""
+    updatedAt: DateTime!
   }
 
   """
@@ -124,6 +130,14 @@ export const typeDefs = gql`
     width: Int
     """图片高度"""
     height: Int
+    """图片位置"""
+    position: Int
+    """产品ID"""
+    productId: ID!
+    """创建时间"""
+    createdAt: DateTime!
+    """最后更新时间"""
+    updatedAt: DateTime!
   }
 
   """
@@ -149,23 +163,23 @@ export const typeDefs = gql`
     """发布时间"""
     publishedAt: DateTime
     """创建时间"""
-    createdAt: DateTime
+    createdAt: DateTime!
     """最后更新时间"""
-    updatedAt: DateTime
+    updatedAt: DateTime!
     """产品标签"""
     tags: [String!]
     """最低价格"""
-    minPrice: Float
+    minPrice: Float!
     """最高价格"""
-    maxPrice: Float
+    maxPrice: Float!
     """总库存量"""
-    totalInventory: Int
+    totalInventory: Int!
     """主图URL"""
     imageUrl: String
     """所有图片"""
-    images: [ProductImage!]
+    images: [ProductImage!]!
     """产品变体"""
-    variants: [ProductVariant!]
+    variants: [ProductVariant!]!
     """最后同步时间"""
     syncedAt: DateTime
   }
@@ -180,6 +194,18 @@ export const typeDefs = gql`
     totalCount: Int!
     """是否有下一页"""
     hasNextPage: Boolean!
+  }
+
+  """
+  用户信息类型
+  """
+  type User {
+    """用户ID"""
+    userId: ID!
+    """用户邮箱"""
+    email: String!
+    """用户角色"""
+    role: String!
   }
 
   """
@@ -206,6 +232,11 @@ export const typeDefs = gql`
       """产品ID"""
       id: ID!
     ): Product
+
+    """
+    获取用户信息
+    """
+    me: User
   }
 `;
 

@@ -1,0 +1,53 @@
+# 查询用户信息
+query GetUserInfo {
+  me {
+    userId
+    email
+    role
+  }
+}
+
+# 查询产品列表
+query GetProducts($limit: Int, $offset: Int) {
+  products(
+    pagination: { limit: $limit, offset: $offset }
+  ) {
+    items {
+      id
+      title
+      vendor
+      status
+      minPrice
+      maxPrice
+      totalInventory
+      imageUrl
+    }
+    totalCount
+    hasNextPage
+  }
+}
+
+# 查询单个产品
+query GetProduct($id: ID!) {
+  product(id: $id) {
+    id
+    title
+    description
+    vendor
+    productType
+    status
+    createdAt
+    updatedAt
+    images {
+      id
+      src
+      altText
+    }
+    variants {
+      id
+      title
+      price
+      inventoryQuantity
+    }
+  }
+} 

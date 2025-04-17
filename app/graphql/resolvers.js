@@ -4,11 +4,85 @@
  */
 
 /**
+ * 授权错误
+ */
+class AuthorizationError extends Error {
+  constructor(message) {
+    super(message || '无权访问此资源');
+    this.name = 'AuthorizationError';
+    this.extensions = {
+      code: 'FORBIDDEN',
+      http: { status: 403 }
+    };
+  }
+}
+
+/**
+ * 认证错误
+ */
+class AuthenticationError extends Error {
+  constructor(message) {
+    super(message || '需要认证');
+    this.name = 'AuthenticationError';
+    this.extensions = {
+      code: 'UNAUTHENTICATED',
+      http: { status: 401 }
+    };
+  }
+}
+
+/**
+ * 验证用户是否已认证
+ * @param {Object} context - GraphQL上下文
+ * @throws {AuthenticationError} 如果用户未认证则抛出错误
+ */
+function ensureAuthenticated(context) {
+  if (!context.isAuthenticated || !context.user) {
+    throw new AuthenticationError('需要认证');
+  }
+}
+
+/**
+ * 验证用户是否可以访问特定店铺的数据
+ * @param {Object} context - GraphQL上下文
+ * @param {string} shopDomain - 店铺域名
+ * @throws {AuthorizationError} 如果用户无权访问则抛出错误
+ */
+function ensureShopAccess(context, shopDomain) {
+  // 如果是API密钥或开发环境，允许访问任何店铺
+  if (context.authInfo.type === 'api-key' || context.authInfo.type === 'development') {
+    return true;
+  }
+  
+  // 如果用户请求特定店铺，验证权限
+  if (shopDomain && context.authInfo.shop && context.authInfo.shop !== shopDomain) {
+    throw new AuthorizationError(`无权访问店铺: ${shopDomain}`);
+  }
+  
+  return true;
+}
+
+/**
+ * 记录查询审计日志
+ * @param {string} operation - 操作名称
+ * @param {Object} params - 操作参数
+ * @param {Object} context - GraphQL上下文
+ */
+function logQueryAudit(operation, params, context) {
+  if (context.user) {
+    console.log(`[AUDIT] ${operation} | 用户: ${context.user.email} | 角色: ${context.user.role}`);
+  } else {
+    console.log(`[AUDIT] ${operation} | 未认证用户`);
+  }
+}
+
+/**
  * 构建 Prisma 查询条件
  * @param {Object} filter - 过滤条件
+ * @param {Object} context - GraphQL上下文
  * @returns {Object} Prisma 查询条件
  */
-function buildWhereClause(filter = {}) {
+function buildWhereClause(filter = {}, context) {
   const where = {};
   const { status, vendor, productType, minInventory, maxInventory, searchQuery, shop } = filter;
 
@@ -144,15 +218,21 @@ export const resolvers = {
     /**
      * 获取产品列表
      */
-    products: async (_, { pagination, filter, sort }, { prisma }) => {
+    products: async (_, { pagination, filter, sort }, context) => {
+      // 验证用户身份
+      ensureAuthenticated(context);
+      
+      // 记录审计日志
+      logQueryAudit('products', { pagination, filter, sort }, context);
+      
       const { limit = 20, offset = 0 } = pagination || {};
       
-      // 构建查询条件
-      const where = buildWhereClause(filter);
+      // 构建查询条件（包含权限检查）
+      const where = buildWhereClause(filter, context);
       const orderBy = buildOrderByClause(sort);
       
       // 查询数据
-      const items = await prisma.product.findMany({
+      const items = await context.prisma.product.findMany({
         where,
         orderBy,
         skip: offset,
@@ -164,7 +244,7 @@ export const resolvers = {
       });
       
       // 查询总数
-      const totalCount = await prisma.product.count({ where });
+      const totalCount = await context.prisma.product.count({ where });
       
       // 构建返回结果
       return {
@@ -181,8 +261,14 @@ export const resolvers = {
     /**
      * 获取单个产品
      */
-    product: async (_, { id }, { prisma }) => {
-      const product = await prisma.product.findUnique({
+    product: async (_, { id }, context) => {
+      // 验证用户身份
+      ensureAuthenticated(context);
+      
+      // 记录审计日志
+      logQueryAudit('product', { id }, context);
+      
+      const product = await context.prisma.product.findUnique({
         where: { id },
         include: {
           images: true,
@@ -200,6 +286,17 @@ export const resolvers = {
         status: product.status?.toUpperCase() || null
       };
     },
+    
+    /**
+     * 获取当前用户信息（用于测试认证）
+     */
+    me: (_, __, context) => {
+      // 验证用户身份
+      ensureAuthenticated(context);
+      
+      // 返回当前用户信息
+      return context.user;
+    }
   },
   
   // 日期时间标量类型解析
