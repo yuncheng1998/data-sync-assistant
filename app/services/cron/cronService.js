@@ -1,108 +1,298 @@
 /**
- * 定时任务服务
+ * Cron服务 - 管理定时任务
  */
 import cron from 'node-cron';
-import { syncAllShopsProducts } from '../sync/productSync.js';
+import { formatISO } from 'date-fns';
+import { 
+  executeProductSync, 
+  executeOrderSync,
+  createSyncTask, 
+  completeSyncTask, 
+  TaskType,
+  getLastSyncTime 
+} from '../database/index.js';
 
-// 任务状态
-let productSyncTask = null;
-let isProductSyncRunning = false;
+// 存储所有活跃的任务
+const activeTasks = new Map();
+
+// 默认同步选项
+export const DEFAULT_SYNC_OPTIONS = {
+  product: {
+    // 增量同步选项
+    incremental: {
+      useIncrementalSync: true,
+      syncModifiedOnly: true,
+      batchSize: 50,
+      includeMetafields: true
+    },
+    // 全量同步选项
+    full: {
+      useIncrementalSync: false,
+      syncModifiedOnly: false,
+      batchSize: 100,
+      includeMetafields: true,
+      deleteStaleProducts: true
+    }
+  },
+  order: {
+    // 增量同步选项
+    incremental: {
+      useIncrementalSync: true,
+      syncModifiedOnly: true,
+      batchSize: 25,
+      includeLineItems: true
+    },
+    // 全量同步选项
+    full: {
+      useIncrementalSync: false,
+      syncModifiedOnly: false,
+      batchSize: 50,
+      includeLineItems: true,
+      includeCustomer: true
+    }
+  }
+};
 
 /**
- * 执行产品同步任务
+ * 执行产品同步
+ * @param {Object} options - 同步选项
+ * @returns {Promise<Object>} 同步结果
  */
-export async function executeProductSync() {
-  // 防止重复执行
-  if (isProductSyncRunning) {
-    console.log('产品同步任务已在运行中，跳过本次执行');
-    return;
-  }
+async function executeProductSyncWithTask(options = DEFAULT_SYNC_OPTIONS.product.incremental) {
+  // 创建同步任务记录
+  const task = await createSyncTask(TaskType.PRODUCT);
+  console.log(`开始产品同步任务 (ID: ${task.id}), 策略: ${options.useIncrementalSync ? '增量' : '全量'}`);
   
   try {
-    console.log('开始执行产品同步定时任务...');
-    isProductSyncRunning = true;
+    // 如果启用了增量同步，获取上次同步时间
+    if (options.useIncrementalSync) {
+      const lastSyncTime = await getLastSyncTime(TaskType.PRODUCT);
+      if (lastSyncTime) {
+        console.log(`使用上次同步时间: ${new Date(lastSyncTime).toISOString()}`);
+        options.modifiedSince = new Date(lastSyncTime);
+      } else {
+        console.log(`没有找到上次同步时间记录，将执行全量同步`);
+        options.useIncrementalSync = false;
+      }
+    }
     
-    // 执行产品同步
-    const result = await syncAllShopsProducts();
+    // 执行同步
+    const result = await executeProductSync(options);
     
-    // 记录执行结果
-    console.log('产品同步定时任务完成:', result.message);
+    // 更新任务状态为完成
+    await completeSyncTask(task.id, true, {
+      strategy: options.useIncrementalSync ? 'incremental' : 'full',
+      count: result.count,
+      syncTime: formatISO(new Date())
+    });
     
     return result;
   } catch (error) {
-    console.error('产品同步定时任务执行失败:', error);
-    throw error;
-  } finally {
-    isProductSyncRunning = false;
-  }
-}
-
-/**
- * 启动产品同步定时任务
- * @param {string} schedule - cron 表达式，默认为每5分钟执行一次
- * @returns {boolean} 是否成功启动
- */
-export function startProductSyncTask(schedule) {
-  // 默认每5分钟执行一次
-  const cronSchedule = schedule || process.env.PRODUCT_SYNC_INTERVAL || '*/5 * * * *';
-  
-  // 如果已经存在任务，先停止
-  if (productSyncTask) {
-    stopProductSyncTask();
-  }
-  
-  try {
-    // 验证 cron 表达式
-    if (!cron.validate(cronSchedule)) {
-      throw new Error(`无效的 cron 表达式: ${cronSchedule}`);
-    }
+    console.error('产品同步失败:', error);
     
-    // 创建定时任务
-    productSyncTask = cron.schedule(cronSchedule, executeProductSync, {
-      scheduled: true,
-      timezone: 'Asia/Shanghai' // 设置时区为中国时区
+    // 更新任务状态为失败
+    await completeSyncTask(task.id, false, {
+      error: error.message,
+      stack: error.stack
     });
     
-    console.log(`产品同步定时任务已启动，调度: ${cronSchedule}`);
-    return true;
-  } catch (error) {
-    console.error('启动产品同步定时任务失败:', error);
-    return false;
+    throw error;
   }
 }
 
 /**
- * 停止产品同步定时任务
- * @returns {boolean} 是否成功停止
+ * 执行订单同步
+ * @param {Object} options - 同步选项
+ * @returns {Promise<Object>} 同步结果
  */
-export function stopProductSyncTask() {
+async function executeOrderSyncWithTask(options = DEFAULT_SYNC_OPTIONS.order.incremental) {
+  // 创建同步任务记录
+  const task = await createSyncTask(TaskType.ORDER);
+  console.log(`开始订单同步任务 (ID: ${task.id}), 策略: ${options.useIncrementalSync ? '增量' : '全量'}`);
+  
   try {
-    if (productSyncTask) {
-      productSyncTask.stop();
-      productSyncTask = null;
-      console.log('产品同步定时任务已停止');
-      return true;
+    // 如果启用了增量同步，获取上次同步时间
+    if (options.useIncrementalSync) {
+      const lastSyncTime = await getLastSyncTime(TaskType.ORDER);
+      if (lastSyncTime) {
+        console.log(`使用上次同步时间: ${new Date(lastSyncTime).toISOString()}`);
+        options.modifiedSince = new Date(lastSyncTime);
+      } else {
+        console.log(`没有找到上次同步时间记录，将执行全量同步`);
+        options.useIncrementalSync = false;
+      }
     }
     
-    return false;
+    // 执行同步
+    const result = await executeOrderSync(options);
+    
+    // 更新任务状态为完成
+    await completeSyncTask(task.id, true, {
+      strategy: options.useIncrementalSync ? 'incremental' : 'full',
+      count: result.count,
+      syncTime: formatISO(new Date())
+    });
+    
+    return result;
   } catch (error) {
-    console.error('停止产品同步定时任务失败:', error);
-    return false;
+    console.error('订单同步失败:', error);
+    
+    // 更新任务状态为失败
+    await completeSyncTask(task.id, false, {
+      error: error.message,
+      stack: error.stack
+    });
+    
+    throw error;
   }
 }
 
 /**
- * 初始化所有定时任务
+ * 判断是否应该执行全量同步
+ * 策略：每周日或每月1日执行全量同步，其他时间执行增量同步
+ * @returns {boolean} 是否需要执行全量同步
+ */
+function shouldPerformFullSync() {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=周日, 1=周一, ..., 6=周六
+  const dayOfMonth = now.getDate(); // 1-31
+  
+  // 周日或月初执行全量同步
+  return dayOfWeek === 0 || dayOfMonth === 1;
+}
+
+/**
+ * 同步所有数据
+ * 根据当前日期决定是执行增量同步还是全量同步
+ * @returns {Promise<Object>} 同步结果
+ */
+export async function syncAllData() {
+  console.log(`开始数据同步，时间: ${new Date().toISOString()}`);
+  
+  // 确定同步策略
+  const fullSync = shouldPerformFullSync();
+  const productOptions = fullSync 
+    ? DEFAULT_SYNC_OPTIONS.product.full 
+    : DEFAULT_SYNC_OPTIONS.product.incremental;
+  
+  const orderOptions = fullSync 
+    ? DEFAULT_SYNC_OPTIONS.order.full 
+    : DEFAULT_SYNC_OPTIONS.order.incremental;
+  
+  console.log(`同步策略: ${fullSync ? '全量同步' : '增量同步'}`);
+  
+  // 执行同步
+  try {
+    // 先同步产品
+    const productResult = await executeProductSyncWithTask(productOptions);
+    console.log(`产品同步完成，同步了 ${productResult.count} 个产品`);
+    
+    // 再同步订单
+    const orderResult = await executeOrderSyncWithTask(orderOptions);
+    console.log(`订单同步完成，同步了 ${orderResult.count} 个订单`);
+    
+    return {
+      success: true,
+      product: productResult,
+      order: orderResult
+    };
+  } catch (error) {
+    console.error('数据同步过程中发生错误:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 启动数据同步定时任务
+ * @param {string} schedule - Cron表达式，默认为每5分钟执行一次
+ * @returns {Object} 任务信息
+ */
+export function startDataSyncTask(schedule = '*/5 * * * *') {
+  if (activeTasks.has('dataSync')) {
+    console.warn('数据同步任务已经在运行中');
+    return {
+      taskId: 'dataSync',
+      running: true,
+      message: '数据同步任务已经在运行中'
+    };
+  }
+  
+  // 验证cron表达式是否有效
+  if (!cron.validate(schedule)) {
+    throw new Error(`无效的cron表达式: ${schedule}`);
+  }
+  
+  console.log(`启动数据同步定时任务，调度: ${schedule}`);
+  
+  // 创建并启动任务
+  const task = cron.schedule(schedule, syncAllData, {
+    scheduled: true,
+    timezone: 'Asia/Shanghai' // 使用中国时区
+  });
+  
+  // 存储任务引用
+  activeTasks.set('dataSync', {
+    task,
+    schedule,
+    startTime: new Date()
+  });
+  
+  return {
+    taskId: 'dataSync',
+    running: true,
+    schedule,
+    startTime: new Date()
+  };
+}
+
+/**
+ * 停止数据同步定时任务
+ * @returns {boolean} 是否成功停止
+ */
+export function stopDataSyncTask() {
+  if (!activeTasks.has('dataSync')) {
+    console.warn('数据同步任务未在运行');
+    return false;
+  }
+  
+  const taskInfo = activeTasks.get('dataSync');
+  taskInfo.task.stop();
+  activeTasks.delete('dataSync');
+  
+  console.log(`数据同步定时任务已停止，运行时间: ${Date.now() - taskInfo.startTime.getTime()}ms`);
+  return true;
+}
+
+/**
+ * 初始化所有Cron任务
  */
 export function initializeCronTasks() {
-  console.log('正在初始化定时任务...');
+  // 检查环境变量是否启用了数据同步
+  const enableDataSync = process.env.ENABLE_DATA_SYNC !== 'false';
   
-  // 检查环境变量是否启用产品同步
-  const enableProductSync = process.env.ENABLE_PRODUCT_SYNC === 'true';
-  
-  if (enableProductSync) {
-    startProductSyncTask();
+  if (enableDataSync) {
+    // 默认为每5分钟执行一次
+    const dataSyncSchedule = process.env.DATA_SYNC_SCHEDULE || '*/5 * * * *';
+    startDataSyncTask(dataSyncSchedule);
   } else {
-    console.log('产品同步定时任务未启用 (ENABLE_PRODUCT_SYNC != true)');
+    console.log('数据自动同步功能已禁用，可通过设置环境变量 ENABLE_DATA_SYNC=true 启用');
   }
+  
+  // 未来可以在这里添加其他定时任务
+}
+
+/**
+ * 关闭所有Cron任务
+ */
+export function shutdownCronTasks() {
+  for (const [taskId, taskInfo] of activeTasks.entries()) {
+    console.log(`停止任务: ${taskId}`);
+    taskInfo.task.stop();
+  }
+  
+  activeTasks.clear();
+  console.log('所有定时任务已停止');
 } 

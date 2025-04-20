@@ -1,6 +1,7 @@
 import { json } from '@remix-run/node';
 import { authenticate } from '../shopify.server.js';
 import { syncShopOrders, syncAllShopsOrders } from '../services/sync/orderSync.js';
+import { createSyncTask, completeSyncTask, TaskType } from '../services/database/syncTaskService.js';
 
 /**
  * 手动触发订单同步 API
@@ -16,14 +17,34 @@ export async function action({ request }) {
     const syncType = formData.get('syncType') || 'current';
     
     let result;
-    if (syncType === 'all') {
-      // 同步所有店铺的订单
-      console.log('手动触发: 同步所有店铺的订单');
-      result = await syncAllShopsOrders();
-    } else {
-      // 只同步当前店铺的订单
-      console.log(`手动触发: 同步店铺 ${shop} 的订单`);
-      result = await syncShopOrders(shop);
+    let taskShop = syncType === 'all' ? 'all' : shop;
+    // 创建同步任务记录
+    const taskRecord = await createSyncTask(TaskType.ORDER, taskShop);
+    
+    try {
+      if (syncType === 'all') {
+        // 同步所有店铺的订单
+        console.log('手动触发: 同步所有店铺的订单');
+        result = await syncAllShopsOrders();
+      } else {
+        // 只同步当前店铺的订单
+        console.log(`手动触发: 同步店铺 ${shop} 的订单`);
+        result = await syncShopOrders(shop);
+      }
+      
+      // 更新任务记录
+      await completeSyncTask(taskRecord.id, result.success, result);
+    } catch (error) {
+      console.error('订单同步 API 执行失败:', error);
+      
+      // 更新任务记录为失败
+      await completeSyncTask(taskRecord.id, false, {
+        success: false,
+        message: `订单同步失败: ${error.message}`,
+        error: error.stack
+      });
+      
+      throw error;
     }
     
     return json({

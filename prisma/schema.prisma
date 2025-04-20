@@ -101,3 +101,17 @@ model OrderLineItem {
   price     String?
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
+
+// 同步任务历史记录
+model SyncTask {
+  id          Int       @id @default(autoincrement())
+  taskType    String    // 任务类型: product, order, customer
+  shopId      String    // 店铺名称，如果是全局任务则为 "all"
+  status      String    // 任务状态: pending, completed, failed
+  startTime   DateTime  // 任务开始时间
+  endTime     DateTime? // 任务结束时间
+  duration    Int?      // 任务持续时间（毫秒）
+  resultData  Json?     // 结果数据
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+}

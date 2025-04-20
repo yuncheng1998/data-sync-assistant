@@ -39,6 +39,7 @@
     "@shopify/polaris-icons": "^9.3.1",
     "@shopify/shopify-app-remix": "^3.7.0",
     "@shopify/shopify-app-session-storage-prisma": "^6.0.0",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.5.0",
     "graphql": "^16.8.1",
     "graphql-request": "^6.1.0",

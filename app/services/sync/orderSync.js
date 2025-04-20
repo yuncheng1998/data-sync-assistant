@@ -1,16 +1,21 @@
 /**
  * 订单同步服务
  */
-import { getAllOrders } from '../shopify/apiClient.js';
-import { saveOrders } from '../database/orderService.js';
+import { 
+  getAllOrders, 
+  getRecentlyUpdatedOrders, 
+  getIncrementalOrders 
+} from '../shopify/apiClient.js';
+import { saveOrders, prisma, TaskType } from '../database/index.js';
 import shopify from '../../shopify.server.js';
 
 /**
  * 同步指定店铺的订单数据
  * @param {string} shop - Shopify 店铺域名
+ * @param {Object} options - 同步选项
  * @returns {Promise<Object>} 同步结果
  */
-export async function syncShopOrders(shop) {
+export async function syncShopOrders(shop, options = {}) {
   console.log(`开始为店铺 ${shop} 同步订单数据...`);
   
   try {
@@ -28,12 +33,52 @@ export async function syncShopOrders(shop) {
       throw new Error(`店铺 ${shop} 没有有效的访问令牌`);
     }
     
-    // 获取订单数据
-    console.log(`正在从 Shopify API 获取 ${shop} 的订单数据...`);
-    const orders = await getAllOrders(shop, validSession.accessToken);
+    // 获取上次同步时间，用于增量同步
+    let lastSyncTime = null;
+    if (options.incremental !== false) { // 默认进行增量同步
+      const lastSyncTask = await prisma.syncTask.findFirst({
+        where: {
+          shopId: shop,
+          taskType: TaskType.ORDER,
+          status: 'completed'
+        },
+        orderBy: {
+          endTime: 'desc'
+        }
+      });
+      
+      if (lastSyncTask?.endTime) {
+        // 设置增量同步时间（从上次同步前1天开始，避免遗漏）
+        lastSyncTime = new Date(lastSyncTask.endTime);
+        lastSyncTime.setDate(lastSyncTime.getDate() - 1); // 往前1天，确保不会遗漏边界数据
+        
+        console.log(`使用增量同步，上次同步时间: ${lastSyncTime.toISOString()}`);
+      }
+    }
+    
+    // 根据同步策略选择合适的API调用
+    let orders;
+    if (options.fullSync) {
+      // 全量同步
+      console.log(`执行全量同步所有订单...`);
+      orders = await getAllOrders(shop, validSession.accessToken, options);
+    } else if (options.recentOnly) {
+      // 仅同步最近订单（默认7天）
+      const days = options.days || 7;
+      console.log(`仅同步最近 ${days} 天更新的订单...`);
+      orders = await getRecentlyUpdatedOrders(shop, validSession.accessToken, days);
+    } else if (lastSyncTime) {
+      // 增量同步
+      console.log(`执行增量同步，获取 ${lastSyncTime.toISOString()} 后更新的订单...`);
+      orders = await getIncrementalOrders(shop, validSession.accessToken, lastSyncTime);
+    } else {
+      // 默认获取最近30天的订单
+      console.log(`执行默认同步（最近30天的订单）...`);
+      orders = await getRecentlyUpdatedOrders(shop, validSession.accessToken, 30);
+    }
     
     if (!orders || orders.length === 0) {
-      console.log(`店铺 ${shop} 没有订单数据`);
+      console.log(`店铺 ${shop} 没有需要同步的订单数据`);
       return { success: true, message: '没有订单数据需要同步', count: 0 };
     }
     
@@ -53,16 +98,18 @@ export async function syncShopOrders(shop) {
     return {
       success: false,
       message: `订单同步失败: ${error.message}`,
-      error: error.stack
+      error: error.stack,
+      count: 0
     };
   }
 }
 
 /**
  * 同步所有店铺的订单数据
+ * @param {Object} options - 同步选项
  * @returns {Promise<Object>} 同步结果
  */
-export async function syncAllShopsOrders() {
+export async function syncAllShopsOrders(options = {}) {
   console.log(`开始同步所有店铺的订单数据...`);
   
   try {
@@ -91,10 +138,15 @@ export async function syncAllShopsOrders() {
     // 同步每个店铺的订单
     const results = [];
     let totalOrders = 0;
+    let allSuccess = true;
     
     for (const shop of uniqueShops) {
-      const result = await syncShopOrders(shop);
+      const result = await syncShopOrders(shop, options);
       results.push({ shop, ...result });
+      
+      if (!result.success) {
+        allSuccess = false;
+      }
       
       if (result.success && result.count) {
         totalOrders += result.count;
@@ -102,9 +154,13 @@ export async function syncAllShopsOrders() {
     }
     
     // 返回同步结果
+    const message = allSuccess
+      ? `已同步 ${uniqueShops.length} 个店铺的 ${totalOrders} 个订单`
+      : `部分店铺同步失败，已成功同步 ${totalOrders} 个订单`;
+      
     return {
-      success: true,
-      message: `已同步 ${uniqueShops.length} 个店铺的 ${totalOrders} 个订单`,
+      success: allSuccess,
+      message,
       shops: uniqueShops.length,
       orders: totalOrders,
       details: results
@@ -114,7 +170,9 @@ export async function syncAllShopsOrders() {
     return {
       success: false,
       message: `同步所有店铺订单失败: ${error.message}`,
-      error: error.stack
+      error: error.stack,
+      shops: 0,
+      orders: 0
     };
   }
 }
@@ -123,9 +181,10 @@ export async function syncAllShopsOrders() {
  * 同步指定店铺的订单数据（简化接口，仅需ID和Token）
  * @param {string} shopId - Shopify 店铺域名
  * @param {string} accessToken - 访问令牌
+ * @param {Object} options - 同步选项
  * @returns {Promise<Object>} 同步结果
  */
-export async function syncOrdersForShop(shopId, accessToken) {
+export async function syncOrdersForShop(shopId, accessToken, options = {}) {
   console.log(`开始为店铺 ${shopId} 同步订单数据...`);
   
   try {
@@ -133,12 +192,25 @@ export async function syncOrdersForShop(shopId, accessToken) {
       throw new Error('店铺ID和访问令牌都是必需的');
     }
     
-    // 获取订单数据
-    console.log(`正在从 Shopify API 获取 ${shopId} 的订单数据...`);
-    const orders = await getAllOrders(shopId, accessToken);
+    // 根据同步策略选择合适的API调用
+    let orders;
+    if (options.fullSync) {
+      // 全量同步
+      console.log(`执行全量同步所有订单...`);
+      orders = await getAllOrders(shopId, accessToken, options);
+    } else if (options.recentOnly) {
+      // 仅同步最近订单（默认7天）
+      const days = options.days || 7;
+      console.log(`仅同步最近 ${days} 天更新的订单...`);
+      orders = await getRecentlyUpdatedOrders(shopId, accessToken, days);
+    } else {
+      // 默认获取最近30天的订单
+      console.log(`执行默认同步（最近30天的订单）...`);
+      orders = await getRecentlyUpdatedOrders(shopId, accessToken, 30);
+    }
     
     if (!orders || orders.length === 0) {
-      console.log(`店铺 ${shopId} 没有订单数据`);
+      console.log(`店铺 ${shopId} 没有需要同步的订单数据`);
       return { success: true, message: '没有订单数据需要同步', count: 0 };
     }
     
@@ -158,7 +230,8 @@ export async function syncOrdersForShop(shopId, accessToken) {
     return {
       success: false,
       message: `订单同步失败: ${error.message}`,
-      error: error.stack
+      error: error.stack,
+      count: 0
     };
   }
 } 
