@@ -3,7 +3,7 @@
 client_id = "bc414c52b400a13519833e5ee4cac357"
 name = "data-sync-assistant"
 handle = "data-sync-assistant"
-application_url = "https://protection-insertion-concentration-ebook.trycloudflare.com"
+application_url = "https://lazy-radios-adoption-threat.trycloudflare.com"
 embedded = true
 
 [build]
@@ -27,9 +27,9 @@ scopes = "read_discounts,read_customers,read_orders,read_products,write_customer
 
 [auth]
 redirect_urls = [
-  "https://protection-insertion-concentration-ebook.trycloudflare.com/auth/callback",
-  "https://protection-insertion-concentration-ebook.trycloudflare.com/auth/shopify/callback",
-  "https://protection-insertion-concentration-ebook.trycloudflare.com/api/auth/callback"
+  "https://lazy-radios-adoption-threat.trycloudflare.com/auth/callback",
+  "https://lazy-radios-adoption-threat.trycloudflare.com/auth/shopify/callback",
+  "https://lazy-radios-adoption-threat.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]

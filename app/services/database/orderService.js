@@ -355,30 +355,39 @@ export async function executeOrderSync(options = {}) {
   try {
     console.log('开始执行订单同步，选项:', options);
     
-    // 默认选项
+    // 导入订单同步服务
+    const { syncAllShopsOrders } = await import('../sync/orderSync.js');
+    
+    // 准备同步选项
     const syncOptions = {
-      batchSize: 25,
-      includeLineItems: true,
-      useIncrementalSync: false,
-      syncModifiedOnly: false,
-      includeCustomer: true,
-      ...options
+      // 增量同步选项
+      useIncrementalSync: options.useIncrementalSync !== false,
+      syncModifiedOnly: options.syncModifiedOnly !== false,
+      // 批量大小
+      batchSize: options.batchSize || 25,
+      // 是否包含行项目
+      includeLineItems: options.includeLineItems !== false,
+      // 是否包含客户信息
+      includeCustomer: options.includeCustomer || false,
+      // 是否全量同步
+      fullSync: options.useIncrementalSync === false
     };
     
-    // 这里应该实现从Shopify API获取订单数据的逻辑
-    // 然后调用saveOrders保存数据
-    // 因为功能尚未完全实现，这里返回一个模拟结果
+    // 执行同步
+    const result = await syncAllShopsOrders(syncOptions);
     
     return {
-      success: true,
-      count: 0,
-      message: '订单同步功能尚未完全实现'
+      success: result.success,
+      count: result.orders || 0,
+      message: result.message || '订单同步已完成',
+      details: result.details || []
     };
   } catch (error) {
     console.error('执行订单同步失败:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
+      count: 0
     };
   }
 }

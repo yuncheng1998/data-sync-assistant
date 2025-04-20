@@ -357,30 +357,39 @@ export async function executeProductSync(options = {}) {
   try {
     console.log('开始执行产品同步，选项:', options);
     
-    // 默认选项
+    // 导入产品同步服务
+    const { syncAllShopsProducts } = await import('../sync/productSync.js');
+    
+    // 准备同步选项
     const syncOptions = {
-      batchSize: 50,
-      includeMetafields: true,
-      useIncrementalSync: false,
-      syncModifiedOnly: false,
-      deleteStaleProducts: false,
-      ...options
+      // 增量同步选项
+      useIncrementalSync: options.useIncrementalSync !== false,
+      syncModifiedOnly: options.syncModifiedOnly !== false,
+      // 批量大小
+      batchSize: options.batchSize || 50,
+      // 是否包含元字段
+      includeMetafields: options.includeMetafields !== false,
+      // 是否删除过时产品
+      deleteStaleProducts: options.deleteStaleProducts || false,
+      // 是否全量同步
+      fullSync: options.useIncrementalSync === false
     };
     
-    // 这里应该实现从Shopify API获取产品数据的逻辑
-    // 然后调用saveProducts保存数据
-    // 因为功能尚未完全实现，这里返回一个模拟结果
+    // 执行同步
+    const result = await syncAllShopsProducts(syncOptions);
     
     return {
-      success: true,
-      count: 0,
-      message: '产品同步功能尚未完全实现'
+      success: result.success,
+      count: result.products || 0,
+      message: result.message || '产品同步已完成',
+      details: result.details || []
     };
   } catch (error) {
     console.error('执行产品同步失败:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
+      count: 0
     };
   }
 } 

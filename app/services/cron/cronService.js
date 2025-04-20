@@ -158,7 +158,8 @@ function shouldPerformFullSync() {
   const dayOfMonth = now.getDate(); // 1-31
   
   // 周日或月初执行全量同步
-  return dayOfWeek === 0 || dayOfMonth === 1;
+  // return dayOfWeek === 0 || dayOfMonth === 1;
+  return false;
 }
 
 /**
