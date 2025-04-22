@@ -108,7 +108,7 @@ The database is defined as a Prisma schema in `prisma/schema.prisma`.
 This use of SQLite works in production if your app runs as a single instance.
 The database that works best for you depends on the data your app needs and how it is queried.
 You can run your database of choice on a server yourself or host it with a SaaS company.
-Here’s a short list of databases providers that provide a free tier to get started:
+Here's a short list of databases providers that provide a free tier to get started:
 
 | Database   | Type             | Hosters                                                                                                                                                                                                                               |
 | ---------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -156,7 +156,7 @@ Using the Vercel Preset is recommended when hosting your Shopify Remix app on Ve
 import { vitePlugin as remix } from "@remix-run/dev";
 import { defineConfig, type UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
-+ import { vercelPreset } from '@vercel/remix/vite';
+import { vercelPreset } from '@vercel/remix/vite';
 
 installGlobals();
 
@@ -164,7 +164,7 @@ export default defineConfig({
   plugins: [
     remix({
       ignoredRouteFiles: ["**/.*"],
-+     presets: [vercelPreset()],
+      presets: [vercelPreset()],
     }),
     tsconfigPaths(),
   ],
@@ -369,3 +369,52 @@ This template uses [Remix](https://remix.run). The following Shopify tools are a
 - [App extensions](https://shopify.dev/docs/apps/app-extensions/list)
 - [Shopify Functions](https://shopify.dev/docs/api/functions)
 - [Getting started with internationalizing your app](https://shopify.dev/docs/apps/best-practices/internationalization/getting-started)
+
+# Shopify 数据同步助手
+
+一个 Shopify 应用，用于同步和管理店铺的产品和订单数据。
+
+## 功能特性
+
+- 产品数据自动同步
+- 订单数据自动同步
+- 数据库存储和管理
+- 定时任务调度
+- 同步历史记录
+
+## 定时任务说明
+
+应用使用 node-cron 库实现定时任务，支持以下功能：
+
+1. **数据同步任务**：默认每 5 分钟执行一次
+   - 产品同步：从 Shopify 获取最新产品数据并同步到数据库
+   - 订单同步：从 Shopify 获取最新订单数据并同步到数据库
+
+2. **同步历史记录**：每次同步任务执行时，会记录以下信息：
+   - 任务类型：产品同步或订单同步
+   - 执行店铺：单店铺同步或全部店铺
+   - 开始时间和结束时间
+   - 成功状态和处理条目数量
+   - 错误信息（如有）
+
+## 环境变量配置
+
+```
+# 数据同步配置
+ENABLE_DATA_SYNC=true  # 启用数据同步任务
+DATA_SYNC_INTERVAL="*/5 * * * *"  # 使用 cron 表达式定义同步频率
+```
+
+## 开发说明
+
+可以通过 API 接口手动触发同步操作：
+
+- 产品同步：`POST /api/products/sync`
+- 订单同步：`POST /api/orders/sync`
+
+请求参数：
+- `syncType`: `current`（仅同步当前店铺）或 `all`（同步所有店铺）
+
+## 许可协议
+
+MIT

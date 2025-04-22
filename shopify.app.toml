@@ -3,7 +3,7 @@
 client_id = "bc414c52b400a13519833e5ee4cac357"
 name = "data-sync-assistant"
 handle = "data-sync-assistant"
-application_url = "https://lazy-radios-adoption-threat.trycloudflare.com"
+application_url = "https://bradford-canal-statistical-physicians.trycloudflare.com"
 embedded = true
 
 [build]
@@ -23,13 +23,13 @@ api_version = "2025-04"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_discounts,read_customers,read_orders,read_products,write_customers,write_products"
+scopes = "read_price_rules,read_discounts,write_discounts,read_customers,read_orders,read_products,write_customers,write_products"
 
 [auth]
 redirect_urls = [
-  "https://lazy-radios-adoption-threat.trycloudflare.com/auth/callback",
-  "https://lazy-radios-adoption-threat.trycloudflare.com/auth/shopify/callback",
-  "https://lazy-radios-adoption-threat.trycloudflare.com/api/auth/callback"
+  "https://bradford-canal-statistical-physicians.trycloudflare.com/auth/callback",
+  "https://bradford-canal-statistical-physicians.trycloudflare.com/auth/shopify/callback",
+  "https://bradford-canal-statistical-physicians.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]

@@ -115,3 +115,34 @@ model SyncTask {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt
 }
+
+// 价格规则
+model PriceRule {
+  id                String          @id
+  shop              String          // 店铺域名
+  title             String          // 规则标题
+  startsAt          DateTime        // 开始时间
+  endsAt            DateTime?       // 结束时间（可为空表示永不过期）
+  valueType         String          // 折扣类型（如percentage, fixed_amount）
+  value             String          // 折扣值（数值字符串）
+  targetType        String          // 目标类型（如line_item, shipping_line）
+  oncePerCustomer   Boolean         // 每个客户仅限一次使用
+  usageLimit        Int?            // 使用次数限制（可为空表示无限制）
+  customerSelection String          // 客户选择方式（如all, prerequisite）
+  createdAt         DateTime        // 创建时间
+  updatedAt         DateTime        // 更新时间
+  syncedAt          DateTime        @default(now()) // 同步时间
+  discountCodes     DiscountCode[]  // 关联的折扣码
+}
+
+// 折扣码
+model DiscountCode {
+  id          String    @id
+  priceRuleId String    // 关联的价格规则ID
+  code        String    // 折扣码
+  usageCount  Int       // 使用次数
+  createdAt   DateTime  // 创建时间
+  updatedAt   DateTime  // 更新时间
+  syncedAt    DateTime  @default(now()) // 同步时间
+  priceRule   PriceRule @relation(fields: [priceRuleId], references: [id], onDelete: Cascade)
+}

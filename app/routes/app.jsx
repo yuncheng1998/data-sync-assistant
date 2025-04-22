@@ -25,6 +25,7 @@ export default function App() {
         <Link to="/app/additional">附加页面</Link>
         <Link to="/app/products/sync">产品同步</Link>
         <Link to="/app/orders/sync">订单同步</Link>
+        <Link to="/app/discounts/sync">折扣同步</Link>
         <Link to="/app/graphql-explorer">GraphQL 浏览器</Link>
       </NavMenu>
       <Outlet />

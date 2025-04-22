@@ -12,4 +12,7 @@ export * from './productService.js';
 export * from './orderService.js';
 
 // 导出同步任务服务
-export * from './syncTaskService.js'; 
+export * from './syncTaskService.js';
+
+// 导出折扣服务
+export * from './discountService.js'; 

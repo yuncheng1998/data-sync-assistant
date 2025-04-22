@@ -6,6 +6,7 @@ import { formatISO } from 'date-fns';
 import { 
   executeProductSync, 
   executeOrderSync,
+  executeDiscountSync,
   createSyncTask, 
   completeSyncTask, 
   TaskType,
@@ -49,6 +50,20 @@ export const DEFAULT_SYNC_OPTIONS = {
       batchSize: 50,
       includeLineItems: true,
       includeCustomer: true
+    }
+  },
+  discount: {
+    // 增量同步选项
+    incremental: {
+      useIncrementalSync: true,
+      syncModifiedOnly: true,
+      batchSize: 50
+    },
+    // 全量同步选项
+    full: {
+      useIncrementalSync: false,
+      syncModifiedOnly: false,
+      batchSize: 100
     }
   }
 };
@@ -148,6 +163,53 @@ async function executeOrderSyncWithTask(options = DEFAULT_SYNC_OPTIONS.order.inc
 }
 
 /**
+ * 执行折扣同步
+ * @param {Object} options - 同步选项
+ * @returns {Promise<Object>} 同步结果
+ */
+async function executeDiscountSyncWithTask(options = DEFAULT_SYNC_OPTIONS.discount.incremental) {
+  // 创建同步任务记录
+  const task = await createSyncTask(TaskType.DISCOUNT);
+  console.log(`开始折扣同步任务 (ID: ${task.id}), 策略: ${options.useIncrementalSync ? '增量' : '全量'}`);
+  
+  try {
+    // 如果启用了增量同步，获取上次同步时间
+    if (options.useIncrementalSync) {
+      const lastSyncTime = await getLastSyncTime(TaskType.DISCOUNT);
+      if (lastSyncTime) {
+        console.log(`使用上次同步时间: ${new Date(lastSyncTime).toISOString()}`);
+        options.modifiedSince = new Date(lastSyncTime);
+      } else {
+        console.log(`没有找到上次同步时间记录，将执行全量同步`);
+        options.useIncrementalSync = false;
+      }
+    }
+    
+    // 执行同步
+    const result = await executeDiscountSync(options);
+    
+    // 更新任务状态为完成
+    await completeSyncTask(task.id, true, {
+      strategy: options.useIncrementalSync ? 'incremental' : 'full',
+      count: result.count,
+      syncTime: formatISO(new Date())
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('折扣同步失败:', error);
+    
+    // 更新任务状态为失败
+    await completeSyncTask(task.id, false, {
+      error: error.message,
+      stack: error.stack
+    });
+    
+    throw error;
+  }
+}
+
+/**
  * 判断是否应该执行全量同步
  * 策略：每周日或每月1日执行全量同步，其他时间执行增量同步
  * @returns {boolean} 是否需要执行全量同步
@@ -180,6 +242,10 @@ export async function syncAllData() {
     ? DEFAULT_SYNC_OPTIONS.order.full 
     : DEFAULT_SYNC_OPTIONS.order.incremental;
   
+  const discountOptions = fullSync 
+    ? DEFAULT_SYNC_OPTIONS.discount.full 
+    : DEFAULT_SYNC_OPTIONS.discount.incremental;
+  
   console.log(`同步策略: ${fullSync ? '全量同步' : '增量同步'}`);
   
   // 执行同步
@@ -192,10 +258,15 @@ export async function syncAllData() {
     const orderResult = await executeOrderSyncWithTask(orderOptions);
     console.log(`订单同步完成，同步了 ${orderResult.count} 个订单`);
     
+    // 最后同步折扣
+    const discountResult = await executeDiscountSyncWithTask(discountOptions);
+    console.log(`折扣同步完成，同步了 ${discountResult.count} 个折扣`);
+    
     return {
       success: true,
       product: productResult,
-      order: orderResult
+      order: orderResult,
+      discount: discountResult
     };
   } catch (error) {
     console.error('数据同步过程中发生错误:', error);
@@ -268,6 +339,80 @@ export function stopDataSyncTask() {
 }
 
 /**
+ * 启动折扣同步定时任务
+ * @param {string} schedule - Cron表达式，默认为每10分钟执行一次
+ * @returns {Object} 任务信息
+ */
+export function startDiscountSyncTask(schedule = '*/10 * * * *') {
+  if (activeTasks.has('discountSync')) {
+    console.warn('折扣同步任务已经在运行中');
+    return {
+      taskId: 'discountSync',
+      running: true,
+      message: '折扣同步任务已经在运行中'
+    };
+  }
+  
+  // 验证cron表达式是否有效
+  if (!cron.validate(schedule)) {
+    throw new Error(`无效的cron表达式: ${schedule}`);
+  }
+  
+  console.log(`启动折扣同步定时任务，调度: ${schedule}`);
+  
+  // 创建并启动任务
+  const task = cron.schedule(schedule, async () => {
+    console.log(`执行定时折扣同步，时间: ${new Date().toISOString()}`);
+    try {
+      const options = shouldPerformFullSync() 
+        ? DEFAULT_SYNC_OPTIONS.discount.full 
+        : DEFAULT_SYNC_OPTIONS.discount.incremental;
+        
+      const result = await executeDiscountSyncWithTask(options);
+      console.log(`折扣同步完成，同步了 ${result.count} 个折扣`);
+      return result;
+    } catch (error) {
+      console.error('折扣同步任务执行失败:', error);
+    }
+  }, {
+    scheduled: true,
+    timezone: 'Asia/Shanghai' // 使用中国时区
+  });
+  
+  // 存储任务引用
+  activeTasks.set('discountSync', {
+    task,
+    schedule,
+    startTime: new Date()
+  });
+  
+  return {
+    taskId: 'discountSync',
+    running: true,
+    schedule,
+    startTime: new Date()
+  };
+}
+
+/**
+ * 停止折扣同步定时任务
+ * @returns {boolean} 是否成功停止
+ */
+export function stopDiscountSyncTask() {
+  if (!activeTasks.has('discountSync')) {
+    console.warn('折扣同步任务未在运行');
+    return false;
+  }
+  
+  const taskInfo = activeTasks.get('discountSync');
+  taskInfo.task.stop();
+  activeTasks.delete('discountSync');
+  
+  console.log(`折扣同步定时任务已停止，运行时间: ${Date.now() - taskInfo.startTime.getTime()}ms`);
+  return true;
+}
+
+/**
  * 初始化所有Cron任务
  */
 export function initializeCronTasks() {
@@ -278,6 +423,10 @@ export function initializeCronTasks() {
     // 默认为每5分钟执行一次
     const dataSyncSchedule = process.env.DATA_SYNC_SCHEDULE || '*/5 * * * *';
     startDataSyncTask(dataSyncSchedule);
+    
+    // 折扣同步默认每10分钟执行一次
+    // const discountSyncSchedule = process.env.DISCOUNT_SYNC_SCHEDULE || '*/10 * * * *';
+    // startDiscountSyncTask(discountSyncSchedule);
   } else {
     console.log('数据自动同步功能已禁用，可通过设置环境变量 ENABLE_DATA_SYNC=true 启用');
   }

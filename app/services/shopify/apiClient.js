@@ -9,6 +9,7 @@ import {
   parseOrderData,
   buildOrderQueryFilter
 } from './orderQueries.js';
+import { GET_PRICE_RULES_QUERY, parsePriceRuleData } from './discountQueries.js';
 
 // GraphQL API URL
 const SHOPIFY_GRAPHQL_URL = (shop) => `https://${shop}/admin/api/2023-07/graphql.json`;
@@ -197,4 +198,113 @@ export async function getIncrementalOrders(shop, accessToken, lastSyncDate) {
   };
   
   return getAllOrders(shop, accessToken, options);
+}
+
+/**
+ * 获取所有价格规则（折扣）
+ * @param {string} shop - Shopify 店铺域名
+ * @param {string} accessToken - 访问令牌
+ * @param {Object} options - 查询选项
+ * @returns {Promise<Array>} 价格规则数据数组
+ */
+export async function getAllPriceRules(shop, accessToken, options = {}) {
+  const client = createGraphQLClient(shop, accessToken);
+  const priceRules = [];
+  
+  let hasNextPage = true;
+  let cursor = null;
+  const batchSize = options.batchSize || 50; // 每批次获取的规则数量
+  
+  // 构建查询过滤器
+  let queryFilter = '';
+  if (options.updatedAfter) {
+    queryFilter = `updated_at:>=${options.updatedAfter}`;
+  }
+  
+  console.log(`开始从 ${shop} 获取价格规则${queryFilter ? `，使用过滤条件: ${queryFilter}` : ''}...`);
+  
+  try {
+    while (hasNextPage) {
+      // 查询变量
+      const variables = {
+        first: batchSize,
+        after: cursor,
+        query: queryFilter || undefined
+      };
+      
+      // 执行 GraphQL 查询
+      const data = await client.request(GET_PRICE_RULES_QUERY, variables);
+      
+      // 提取价格规则数据
+      const { priceRules: priceRulesData } = data;
+      
+      if (priceRulesData && priceRulesData.edges && priceRulesData.edges.length > 0) {
+        // 解析价格规则数据
+        const parsedPriceRules = priceRulesData.edges.map(edge => parsePriceRuleData(edge.node, shop));
+        priceRules.push(...parsedPriceRules);
+        
+        // 更新分页信息
+        hasNextPage = priceRulesData.pageInfo.hasNextPage;
+        cursor = priceRulesData.pageInfo.endCursor;
+        
+        console.log(`已获取 ${priceRules.length} 个价格规则`);
+        
+        // 如果设置了数量限制，检查是否达到限制
+        if (options.limit && priceRules.length >= options.limit) {
+          console.log(`已达到价格规则获取限制 ${options.limit}`);
+          hasNextPage = false;
+          break;
+        }
+      } else {
+        hasNextPage = false;
+      }
+    }
+    
+    console.log(`成功获取 ${shop} 的所有价格规则，共 ${priceRules.length} 个规则`);
+    return priceRules;
+  } catch (error) {
+    console.error(`获取价格规则数据失败:`, error);
+    throw error;
+  }
+}
+
+/**
+ * 获取最近更新的价格规则
+ * @param {string} shop - Shopify 店铺域名
+ * @param {string} accessToken - 访问令牌
+ * @param {number} days - 最近天数，默认7天
+ * @returns {Promise<Array>} 价格规则数据数组
+ */
+export async function getRecentlyUpdatedPriceRules(shop, accessToken, days = 7) {
+  // 计算过滤日期
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  
+  const options = {
+    updatedAfter: date.toISOString().split('T')[0],
+  };
+  
+  return getAllPriceRules(shop, accessToken, options);
+}
+
+/**
+ * 增量同步价格规则
+ * @param {string} shop - Shopify 店铺域名
+ * @param {string} accessToken - 访问令牌
+ * @param {Date} lastSyncDate - 上次同步时间
+ * @returns {Promise<Array>} 价格规则数据数组
+ */
+export async function getIncrementalPriceRules(shop, accessToken, lastSyncDate) {
+  // 如果没有提供上次同步时间，使用7天前
+  if (!lastSyncDate) {
+    const date = new Date();
+    date.setDate(date.getDate() - 7);
+    lastSyncDate = date;
+  }
+  
+  const options = {
+    updatedAfter: lastSyncDate.toISOString().split('T')[0]
+  };
+  
+  return getAllPriceRules(shop, accessToken, options);
 } 

@@ -9,7 +9,8 @@ import prisma from '../../db.server.js';
 export const TaskType = {
   PRODUCT: 'PRODUCT',
   ORDER: 'ORDER',
-  CUSTOMER: 'CUSTOMER'
+  CUSTOMER: 'CUSTOMER',
+  DISCOUNT: 'DISCOUNT'
 };
 
 /**
@@ -181,6 +182,10 @@ export async function getTaskStats() {
     where: { taskType: TaskType.CUSTOMER }
   });
   
+  const discountTasks = await prisma.syncTask.count({
+    where: { taskType: TaskType.DISCOUNT }
+  });
+  
   // 最近成功的任务
   const recentSuccessful = await prisma.syncTask.findMany({
     where: { status: TaskStatus.COMPLETED },
@@ -205,7 +210,8 @@ export async function getTaskStats() {
     byType: {
       product: productTasks,
       order: orderTasks,
-      customer: customerTasks
+      customer: customerTasks,
+      discount: discountTasks
     },
     recentSuccessful,
     recentFailed
