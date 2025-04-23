@@ -1,5 +1,5 @@
 import { json } from '@remix-run/node';
-import { authenticate } from '../shopify.server.js';
+import { enhancedAuthentication } from '../middleware/authMiddleware.js';
 import { syncShopOrders, syncAllShopsOrders } from '../services/sync/orderSync.js';
 import { createSyncTask, completeSyncTask, TaskType } from '../services/database/syncTaskService.js';
 
@@ -9,7 +9,7 @@ import { createSyncTask, completeSyncTask, TaskType } from '../services/database
 export async function action({ request }) {
   try {
     // 验证请求
-    const { session } = await authenticate.admin(request);
+    const { session } = await enhancedAuthentication.admin(request);
     const { shop } = session;
     
     // 解析请求数据

@@ -1,7 +1,7 @@
-import { authenticate } from "../shopify.server";
+import { enhancedAuthentication } from "../middleware/authMiddleware";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
+  await enhancedAuthentication.admin(request);
 
   return null;
 };

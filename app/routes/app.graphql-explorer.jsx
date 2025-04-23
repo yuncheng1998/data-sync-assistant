@@ -20,11 +20,11 @@ import {
   Tooltip,
 } from "@shopify/polaris";
 import { DuplicateIcon } from '@shopify/polaris-icons';
-import { authenticate } from "../shopify.server";
+import { enhancedAuthentication } from "../middleware/authMiddleware";
 
 // 加载器 - 获取当前店铺信息
 export const loader = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { admin, session } = await enhancedAuthentication.admin(request);
   
   return json({
     shop: session.shop,

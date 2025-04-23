@@ -361,7 +361,7 @@ export async function executeOrderSync(options = {}) {
     // 准备同步选项
     const syncOptions = {
       // 增量同步选项
-      useIncrementalSync: options.useIncrementalSync !== false,
+      incremental: options.useIncrementalSync !== false,
       syncModifiedOnly: options.syncModifiedOnly !== false,
       // 批量大小
       batchSize: options.batchSize || 25,
@@ -369,8 +369,8 @@ export async function executeOrderSync(options = {}) {
       includeLineItems: options.includeLineItems !== false,
       // 是否包含客户信息
       includeCustomer: options.includeCustomer || false,
-      // 是否全量同步
-      fullSync: options.useIncrementalSync === false
+      // 增量同步的开始时间
+      updatedAfter: options.modifiedSince
     };
     
     // 执行同步

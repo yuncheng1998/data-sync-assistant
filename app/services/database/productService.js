@@ -363,7 +363,7 @@ export async function executeProductSync(options = {}) {
     // 准备同步选项
     const syncOptions = {
       // 增量同步选项
-      useIncrementalSync: options.useIncrementalSync !== false,
+      incremental: options.useIncrementalSync !== false,
       syncModifiedOnly: options.syncModifiedOnly !== false,
       // 批量大小
       batchSize: options.batchSize || 50,
@@ -371,8 +371,8 @@ export async function executeProductSync(options = {}) {
       includeMetafields: options.includeMetafields !== false,
       // 是否删除过时产品
       deleteStaleProducts: options.deleteStaleProducts || false,
-      // 是否全量同步
-      fullSync: options.useIncrementalSync === false
+      // 如果显式提供了modifiedSince值，使用它作为增量同步的起始时间
+      updatedAfter: options.modifiedSince
     };
     
     // 执行同步

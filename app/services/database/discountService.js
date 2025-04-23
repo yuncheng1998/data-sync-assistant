@@ -325,12 +325,12 @@ export async function executeDiscountSync(options = {}) {
     // 准备同步选项
     const syncOptions = {
       // 增量同步选项
-      useIncrementalSync: options.useIncrementalSync !== false,
+      incremental: options.useIncrementalSync !== false,
       syncModifiedOnly: options.syncModifiedOnly !== false,
       // 批量大小
       batchSize: options.batchSize || 50,
-      // 是否全量同步
-      fullSync: options.useIncrementalSync === false
+      // 增量同步的开始时间
+      updatedAfter: options.modifiedSince
     };
     
     // 执行同步

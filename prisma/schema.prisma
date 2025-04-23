@@ -7,6 +7,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 商店信息表
+model Store {
+  id                String    @id @default(cuid())
+  shop              String    @unique // 商店域名，例如：mystore.myshopify.com
+  status            String    @default("ACTIVE") // 状态：ACTIVE, UNINSTALLED
+  installDate       DateTime  @default(now()) // 应用安装时间
+  uninstalledAt     DateTime? // 应用卸载时间
+  lastAuthenticated DateTime? // 最后认证时间
+  plan              String?   // 商店订阅的计划
+  locale            String?   // 商店语言设置
+  country           String?   // 商店所在国家
+  timezone          String?   // 商店时区
+  currency          String?   // 商店币种
+  owner             String?   // 商店所有者名称
+  email             String?   // 商店联系邮箱
+  phone             String?   // 商店联系电话
+  address           String?   // 商店地址
+  lastLogin         DateTime? // 最后一次登录时间
+  metafields        Json?     // 额外信息
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
 model Session {
   id            String    @id
   shop          String
@@ -145,4 +168,29 @@ model DiscountCode {
   updatedAt   DateTime  // 更新时间
   syncedAt    DateTime  @default(now()) // 同步时间
   priceRule   PriceRule @relation(fields: [priceRuleId], references: [id], onDelete: Cascade)
+}
+
+// 店铺认证日志
+model StoreAuthLog {
+  id              Int      @id @default(autoincrement())
+  shop            String   // 商店域名
+  authenticatedAt DateTime @default(now()) // 认证时间
+  accessScopes    String?  // 访问权限
+  userType        String?  // 用户类型：OWNER, STAFF
+  userEmail       String?  // 用户邮箱
+  userName        String?  // 用户名称
+  ipAddress       String?  // IP地址
+  userAgent       String?  // 浏览器标识
+  createdAt       DateTime @default(now())
+}
+
+// 店铺认证错误日志
+model StoreAuthErrorLog {
+  id          Int      @id @default(autoincrement())
+  shop        String   // 商店域名
+  errorAt     DateTime @default(now()) // 错误时间
+  errorMessage String   // 错误消息
+  ipAddress   String?  // IP地址
+  userAgent   String?  // 浏览器标识
+  createdAt   DateTime @default(now())
 }

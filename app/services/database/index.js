@@ -15,4 +15,7 @@ export * from './orderService.js';
 export * from './syncTaskService.js';
 
 // 导出折扣服务
-export * from './discountService.js'; 
+export * from './discountService.js';
+
+// 导出商店服务
+export * from './storeService.js'; 
