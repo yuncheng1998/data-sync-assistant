@@ -3,7 +3,7 @@
 client_id = "bc414c52b400a13519833e5ee4cac357"
 name = "data-sync-assistant"
 handle = "data-sync-assistant"
-application_url = "https://hire-math-sorry-winner.trycloudflare.com"
+application_url = "https://implies-corners-features-addressed.trycloudflare.com"
 embedded = true
 
 [build]
@@ -27,9 +27,9 @@ scopes = "read_price_rules,read_discounts,write_discounts,read_customers,read_or
 
 [auth]
 redirect_urls = [
-  "https://hire-math-sorry-winner.trycloudflare.com/auth/callback",
-  "https://hire-math-sorry-winner.trycloudflare.com/auth/shopify/callback",
-  "https://hire-math-sorry-winner.trycloudflare.com/api/auth/callback"
+  "https://implies-corners-features-addressed.trycloudflare.com/auth/callback",
+  "https://implies-corners-features-addressed.trycloudflare.com/auth/shopify/callback",
+  "https://implies-corners-features-addressed.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
